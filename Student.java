@@ -1,386 +1,133 @@
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Scanner;
 import java.util.Stack;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+/**
+ * Student Record Management System - Java console version.
+ * Demonstrates OOP, ArrayList, Stack, linear search and bubble sort.
+ * Run: javac Student.java && java Student
+ *
+ * This Java program is separate from the static GitHub Pages website.
+ */
 public class Student {
+    private final int rollNumber;
+    private final String name;
+    private final String course;
+    private final double marks;
 
-    static class StudentRecord {
-        int rollNo;
-        String name;
-        double marks;
-
-        StudentRecord(int rollNo, String name, double marks) {
-            this.rollNo = rollNo;
-            this.name = name;
-            this.marks = marks;
-        }
+    public Student(int rollNumber, String name, String course, double marks) {
+        this.rollNumber = rollNumber;
+        this.name = name;
+        this.course = course;
+        this.marks = marks;
     }
 
-    static final List<StudentRecord> students = new ArrayList<>();
-    static final Stack<StudentRecord> deletedStudents = new Stack<>();
+    public int getRollNumber() { return rollNumber; }
+    public String getName() { return name; }
+    public String getCourse() { return course; }
+    public double getMarks() { return marks; }
 
-    static final Path ROOT = Paths.get(".")
-            .toAbsolutePath().normalize();
-
-    public static void main(String[] args) throws Exception {
-
-        int port = Integer.parseInt(
-                System.getenv().getOrDefault("PORT", "8080")
-        );
-
-        HttpServer server = HttpServer.create(
-                new InetSocketAddress("0.0.0.0", port), 0
-        );
-
-        server.createContext("/api/students", Student::handleApi);
-        server.createContext("/", Student::handleFiles);
-
-        server.start();
-
-        System.out.println("Student Record Management System started!");
-        System.out.println("Listening on port: " + port);
+    @Override
+    public String toString() {
+        return String.format("Roll: %-5d | Name: %-20s | Course: %-14s | Marks: %.2f",
+                rollNumber, name, course, marks);
     }
 
-    // LINEAR SEARCH
-    static StudentRecord searchStudent(int rollNo) {
-        for (StudentRecord s : students) {
-            if (s.rollNo == rollNo) {
-                return s;
+    public static void main(String[] args) {
+        ArrayList<Student> students = new ArrayList<>();
+        Stack<Student> deleted = new Stack<>();
+        Scanner in = new Scanner(System.in);
+        students.add(new Student(101, "Aarav Menon", "B.Tech CSE", 88));
+        students.add(new Student(102, "Ananya Joseph", "B.Tech CSE", 94));
+        students.add(new Student(103, "Rahul Das", "B.Tech ECE", 76));
+
+        boolean running = true;
+        while (running) {
+            System.out.println("\n=== STUDENT RECORD MANAGEMENT SYSTEM ===");
+            System.out.println("1. Display all students");
+            System.out.println("2. Add student");
+            System.out.println("3. Search by roll number");
+            System.out.println("4. Sort by marks (bubble sort)");
+            System.out.println("5. Delete student");
+            System.out.println("6. Restore last deleted student (stack)");
+            System.out.println("0. Exit");
+            System.out.print("Choose an option: ");
+            int choice = readInt(in);
+            switch (choice) {
+                case 1 -> display(students);
+                case 2 -> add(in, students);
+                case 3 -> {
+                    System.out.print("Roll number to search: ");
+                    Student s = find(students, readInt(in));
+                    System.out.println(s == null ? "Student not found." : "Record found: " + s);
+                }
+                case 4 -> { bubbleSort(students); System.out.println("Sorted by marks, highest first."); display(students); }
+                case 5 -> {
+                    System.out.print("Roll number to delete: ");
+                    Student s = find(students, readInt(in));
+                    if (s == null) System.out.println("Student not found.");
+                    else { students.remove(s); deleted.push(s); System.out.println("Record deleted."); }
+                }
+                case 6 -> {
+                    if (deleted.empty()) System.out.println("No deleted record to restore.");
+                    else {
+                        Student s = deleted.peek();
+                        if (find(students, s.getRollNumber()) != null) System.out.println("That roll number already exists.");
+                        else { students.add(deleted.pop()); System.out.println("Last deleted record restored."); }
+                    }
+                }
+                case 0 -> running = false;
+                default -> System.out.println("Invalid option.");
             }
         }
+        in.close();
+        System.out.println("Program closed.");
+    }
+
+    private static int readInt(Scanner in) {
+        while (!in.hasNextInt()) { System.out.print("Enter a whole number: "); in.next(); }
+        return in.nextInt();
+    }
+
+    private static void display(ArrayList<Student> students) {
+        if (students.isEmpty()) { System.out.println("No student records."); return; }
+        for (Student s : students) System.out.println(s);
+    }
+
+    private static void add(Scanner in, ArrayList<Student> students) {
+        System.out.print("Roll number: ");
+        int roll = readInt(in);
+        if (find(students, roll) != null) { System.out.println("That roll number already exists."); return; }
+        in.nextLine();
+        System.out.print("Student name: "); String name = in.nextLine().trim();
+        System.out.print("Course/department: "); String course = in.nextLine().trim();
+        System.out.print("Marks (0-100): ");
+        double marks;
+        while (!in.hasNextDouble()) { System.out.print("Enter a valid number: "); in.next(); }
+        marks = in.nextDouble();
+        if (name.isEmpty() || course.isEmpty() || marks < 0 || marks > 100) {
+            System.out.println("Invalid name, course or marks."); return;
+        }
+        students.add(new Student(roll, name, course, marks));
+        System.out.println("Student added successfully.");
+    }
+
+    // Linear search: checks each student one by one.
+    private static Student find(ArrayList<Student> students, int roll) {
+        for (Student s : students) if (s.getRollNumber() == roll) return s;
         return null;
     }
 
-    // JSON ESCAPING
-    static String escapeJson(String text) {
-        return text.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
-    }
-
-    static String studentJson(StudentRecord s) {
-        return "{\"rollNo\":" + s.rollNo
-                + ",\"name\":\"" + escapeJson(s.name) + "\""
-                + ",\"marks\":" + s.marks + "}";
-    }
-
-    static String listJson(List<StudentRecord> list) {
-        StringBuilder json = new StringBuilder("[");
-
-        for (int i = 0; i < list.size(); i++) {
-            if (i > 0) {
-                json.append(",");
-            }
-            json.append(studentJson(list.get(i)));
-        }
-
-        return json.append("]").toString();
-    }
-
-    static String allDataJson() {
-        return "{\"students\":" + listJson(students)
-                + ",\"deletedStudents\":" + listJson(deletedStudents)
-                + "}";
-    }
-
-    // READ REQUEST FIELDS
-    static String field(String json, String key) {
-        Pattern pattern = Pattern.compile(
-                "\"" + Pattern.quote(key)
-                + "\"\\s*:\\s*(?:\"((?:\\\\.|[^\"\\\\])*)\"|([^,}\\s]+))"
-        );
-
-        Matcher matcher = pattern.matcher(json);
-
-        if (!matcher.find()) {
-            return null;
-        }
-
-        if (matcher.group(1) != null) {
-            return matcher.group(1)
-                    .replace("\\\"", "\"")
-                    .replace("\\\\", "\\")
-                    .replace("\\n", "\n")
-                    .replace("\\r", "\r")
-                    .replace("\\t", "\t");
-        }
-
-        return matcher.group(2);
-    }
-
-    static void sendJson(
-            HttpExchange exchange, int status, String body
-    ) throws IOException {
-
-        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-
-        exchange.getResponseHeaders().set(
-                "Content-Type", "application/json; charset=UTF-8"
-        );
-
-        exchange.getResponseHeaders().set(
-                "Cache-Control", "no-store"
-        );
-
-        exchange.sendResponseHeaders(status, bytes.length);
-
-        try (var output = exchange.getResponseBody()) {
-            output.write(bytes);
-        }
-    }
-
-    // API HANDLER
-    static void handleApi(HttpExchange exchange) throws IOException {
-
-        try {
-            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJson(exchange, 200, allDataJson());
-                return;
-            }
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJson(exchange, 405,
-                        "{\"error\":\"Method not allowed.\"}");
-                return;
-            }
-
-            String body = new String(
-                    exchange.getRequestBody().readAllBytes(),
-                    StandardCharsets.UTF_8
-            );
-
-            String action = field(body, "action");
-
-            if (action == null) {
-                sendJson(exchange, 400,
-                        "{\"error\":\"Missing action.\"}");
-                return;
-            }
-
-            String message;
-
-            switch (action) {
-
-                case "add": {
-                    String rollText = field(body, "rollNo");
-                    String name = field(body, "name");
-                    String marksText = field(body, "marks");
-
-                    if (rollText == null || name == null
-                            || marksText == null || name.isBlank()) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Fill in all fields.\"}");
-                        return;
-                    }
-
-                    int rollNo;
-                    double marks;
-
-                    try {
-                        rollNo = Integer.parseInt(rollText);
-                        marks = Double.parseDouble(marksText);
-                    } catch (NumberFormatException e) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Invalid number.\"}");
-                        return;
-                    }
-
-                    if (rollNo < 1 || !Double.isFinite(marks)
-                            || marks < 0 || marks > 100) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Invalid roll number or marks.\"}");
-                        return;
-                    }
-
-                    if (searchStudent(rollNo) != null) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Roll number already exists.\"}");
-                        return;
-                    }
-
-                    students.add(new StudentRecord(
-                            rollNo, name.trim(), marks
-                    ));
-
-                    message = "Student added successfully.";
-                    break;
+    // Bubble sort in descending order of marks.
+    private static void bubbleSort(ArrayList<Student> students) {
+        for (int i = 0; i < students.size() - 1; i++) {
+            for (int j = 0; j < students.size() - 1 - i; j++) {
+                if (students.get(j).getMarks() < students.get(j + 1).getMarks()) {
+                    Student temp = students.get(j);
+                    students.set(j, students.get(j + 1));
+                    students.set(j + 1, temp);
                 }
-
-                case "delete": {
-                    String rollText = field(body, "rollNo");
-
-                    if (rollText == null) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Missing roll number.\"}");
-                        return;
-                    }
-
-                    int rollNo = Integer.parseInt(rollText);
-                    StudentRecord student = searchStudent(rollNo);
-
-                    if (student == null) {
-                        sendJson(exchange, 404,
-                                "{\"error\":\"Student not found.\"}");
-                        return;
-                    }
-
-                    students.remove(student);
-                    deletedStudents.push(student);
-
-                    message = "Student deleted successfully.";
-                    break;
-                }
-
-                case "restore": {
-                    String rollText = field(body, "rollNo");
-
-                    if (rollText == null) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Missing roll number.\"}");
-                        return;
-                    }
-
-                    int rollNo = Integer.parseInt(rollText);
-
-                    if (deletedStudents.empty()) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"No deleted records.\"}");
-                        return;
-                    }
-
-                    StudentRecord latest = deletedStudents.peek();
-
-                    if (latest.rollNo != rollNo) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Restore the most recently deleted student first.\"}");
-                        return;
-                    }
-
-                    if (searchStudent(rollNo) != null) {
-                        sendJson(exchange, 400,
-                                "{\"error\":\"Roll number already exists.\"}");
-                        return;
-                    }
-
-                    students.add(deletedStudents.pop());
-
-                    message = "Student restored successfully.";
-                    break;
-                }
-
-                case "sort": {
-                    // BUBBLE SORT: descending order of marks
-                    for (int i = 0; i < students.size() - 1; i++) {
-                        for (int j = 0;
-                             j < students.size() - i - 1; j++) {
-
-                            if (students.get(j).marks
-                                    < students.get(j + 1).marks) {
-
-                                StudentRecord temp = students.get(j);
-
-                                students.set(
-                                        j, students.get(j + 1)
-                                );
-
-                                students.set(j + 1, temp);
-                            }
-                        }
-                    }
-
-                    message = "Students sorted by marks.";
-                    break;
-                }
-
-                default:
-                    sendJson(exchange, 400,
-                            "{\"error\":\"Unknown action.\"}");
-                    return;
             }
-
-            sendJson(exchange, 200,
-                    "{\"message\":\"" + escapeJson(message) + "\"}");
-
-        } catch (NumberFormatException e) {
-            sendJson(exchange, 400,
-                    "{\"error\":\"Invalid number format.\"}");
-        } catch (Exception e) {
-            e.printStackTrace();
-
-            sendJson(exchange, 500,
-                    "{\"error\":\"Internal server error.\"}");
-        }
-    }
-
-    // SERVE FRONTEND FILES
-    static void handleFiles(HttpExchange exchange) throws IOException {
-
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            exchange.sendResponseHeaders(405, -1);
-            exchange.close();
-            return;
-        }
-
-        String urlPath = exchange.getRequestURI().getPath();
-
-        if (urlPath.equals("/")) {
-            urlPath = "/index.html";
-        }
-
-        Path file = ROOT.resolve(urlPath.substring(1)).normalize();
-
-        if (!file.startsWith(ROOT) || !Files.isRegularFile(file)) {
-            byte[] bytes = "404 - File not found."
-                    .getBytes(StandardCharsets.UTF_8);
-
-            exchange.sendResponseHeaders(404, bytes.length);
-
-            try (var output = exchange.getResponseBody()) {
-                output.write(bytes);
-            }
-
-            return;
-        }
-
-        String contentType;
-
-        if (urlPath.endsWith(".html")) {
-            contentType = "text/html; charset=UTF-8";
-        } else if (urlPath.endsWith(".css")) {
-            contentType = "text/css; charset=UTF-8";
-        } else if (urlPath.endsWith(".js")) {
-            contentType = "text/javascript; charset=UTF-8";
-        } else {
-            contentType = "application/octet-stream";
-        }
-
-        byte[] bytes = Files.readAllBytes(file);
-
-        exchange.getResponseHeaders().set(
-                "Content-Type", contentType
-        );
-
-        exchange.getResponseHeaders().set(
-                "Cache-Control", "no-store"
-        );
-
-        exchange.sendResponseHeaders(200, bytes.length);
-
-        try (var output = exchange.getResponseBody()) {
-            output.write(bytes);
         }
     }
 }

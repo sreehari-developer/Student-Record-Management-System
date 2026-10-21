@@ -1,274 +1,57 @@
-"use strict";
-
-const API = "/api/students";
-
-const $ = (id) => document.getElementById(id);
-
-let allStudents = [];
-let deletedStudents = [];
-let currentSearch = "";
-let sorted = false;
-
-async function apiRequest(action = null, data = {}) {
-    const options = {
-        method: action ? "POST" : "GET",
-        headers: { "Content-Type": "application/json" }
-    };
-
-    if (action) {
-        options.body = JSON.stringify({ action, ...data });
-    }
-
-    const response = await fetch(API, options);
-
-    const result = await response.json();
-
-    if (!response.ok || result.error) {
-        throw new Error(result.error || "Request failed.");
-    }
-
-    return result;
-}
-
-function escapeHTML(value) {
-    return String(value).replace(/[&<>"']/g, (char) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-    })[char]);
-}
-
-function gradeFor(marks) {
-    if (marks >= 90) return "A+";
-    if (marks >= 80) return "A";
-    if (marks >= 70) return "B";
-    if (marks >= 60) return "C";
-    if (marks >= 50) return "D";
-    return "F";
-}
-
-function showMessage(id, message, error = false) {
-    const element = $(id);
-    element.textContent = message;
-    element.style.color = error ? "#fb7185" : "#34d399";
-}
-
-function renderDashboard() {
-    $("totalStudents").textContent = allStudents.length;
-
-    const total = allStudents.reduce(
-        (sum, student) => sum + Number(student.marks), 0
-    );
-
-    const average = allStudents.length
-        ? total / allStudents.length
-        : 0;
-
-    const highest = allStudents.length
-        ? Math.max(...allStudents.map(s => Number(s.marks)))
-        : 0;
-
-    $("averageMarks").textContent = average.toFixed(2);
-    $("topMarks").textContent = highest.toFixed(2);
-    $("recordCount").textContent =
-        `${allStudents.length} record${allStudents.length === 1 ? "" : "s"}`;
-}
-
-function renderStudents() {
-    const tbody = $("studentTableBody");
-
-    const query = currentSearch.trim().toLowerCase();
-
-    const displayed = allStudents.filter(student =>
-        String(student.rollNo).includes(query) ||
-        String(student.name).toLowerCase().includes(query)
-    );
-
-    if (displayed.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="empty">
-                    ${allStudents.length ? "No matching students found." :
-                "No student records yet. Add your first student above."}
-                </td>
-            </tr>`;
-        return;
-    }
-
-    tbody.innerHTML = displayed.map(student => `
-        <tr>
-            <td>${escapeHTML(student.rollNo)}</td>
-            <td>${escapeHTML(student.name)}</td>
-            <td>${Number(student.marks).toFixed(2)}</td>
-            <td>${gradeFor(Number(student.marks))}</td>
-            <td>
-                <button
-                    class="btn danger"
-                    data-delete="${Number(student.rollNo)}"
-                    type="button">
-                    Delete
-                </button>
-            </td>
-        </tr>
-    `).join("");
-}
-
-function renderDeleted() {
-    const tbody = $("deletedTableBody");
-
-    if (deletedStudents.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="4" class="empty">
-                    No deleted records to restore.
-                </td>
-            </tr>`;
-        return;
-    }
-
-    tbody.innerHTML = deletedStudents.map(student => `
-        <tr>
-            <td>${escapeHTML(student.rollNo)}</td>
-            <td>${escapeHTML(student.name)}</td>
-            <td>${Number(student.marks).toFixed(2)}</td>
-            <td>
-                <button
-                    class="btn success"
-                    data-restore="${Number(student.rollNo)}"
-                    type="button">
-                    Restore
-                </button>
-            </td>
-        </tr>
-    `).join("");
-}
-
-async function refreshData() {
-    try {
-        const result = await apiRequest();
-
-        allStudents = result.students || [];
-        deletedStudents = result.deletedStudents || [];
-
-        renderDashboard();
-        renderStudents();
-        renderDeleted();
-    } catch (error) {
-        showMessage(
-            "recordMessage",
-            "Cannot connect to Java server. Run: java Student",
-            true
-        );
-        console.error(error);
-    }
-}
-
-$("studentForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const rollNo = Number($("rollNo").value);
-    const name = $("name").value.trim();
-    const marks = Number($("marks").value);
-
-    if (!Number.isSafeInteger(rollNo) || rollNo < 1) {
-        showMessage("formMessage", "Enter a valid positive roll number.", true);
-        return;
-    }
-
-    if (!name) {
-        showMessage("formMessage", "Enter the student's name.", true);
-        return;
-    }
-
-    if (!Number.isFinite(marks) || marks < 0 || marks > 100) {
-        showMessage("formMessage", "Marks must be between 0 and 100.", true);
-        return;
-    }
-
-    try {
-        const result = await apiRequest("add", { rollNo, name, marks });
-
-        showMessage("formMessage", result.message || "Student added!");
-
-        $("studentForm").reset();
-        currentSearch = "";
-        $("searchInput").value = "";
-
-        await refreshData();
-        $("rollNo").focus();
-    } catch (error) {
-        showMessage("formMessage", error.message, true);
-    }
-});
-
-$("searchBtn").addEventListener("click", () => {
-    currentSearch = $("searchInput").value;
-    renderStudents();
-});
-
-$("searchInput").addEventListener("keydown", event => {
-    if (event.key === "Enter") {
-        event.preventDefault();
-        currentSearch = $("searchInput").value;
-        renderStudents();
-    }
-});
-
-$("showAllBtn").addEventListener("click", () => {
-    currentSearch = "";
-    $("searchInput").value = "";
-    renderStudents();
-});
-
-$("sortBtn").addEventListener("click", async () => {
-    try {
-        const result = await apiRequest("sort");
-
-        showMessage(
-            "recordMessage",
-            result.message || "Students sorted by marks."
-        );
-
-        await refreshData();
-    } catch (error) {
-        showMessage("recordMessage", error.message, true);
-    }
-});
-
-$("studentTableBody").addEventListener("click", async event => {
-    const button = event.target.closest("[data-delete]");
-    if (!button) return;
-
-    const rollNo = Number(button.dataset.delete);
-
-    if (!confirm(`Delete student with roll number ${rollNo}?`)) return;
-
-    try {
-        const result = await apiRequest("delete", { rollNo });
-
-        showMessage("recordMessage", result.message || "Student deleted.");
-        await refreshData();
-    } catch (error) {
-        showMessage("recordMessage", error.message, true);
-    }
-});
-
-$("deletedTableBody").addEventListener("click", async event => {
-    const button = event.target.closest("[data-restore]");
-    if (!button) return;
-
-    const rollNo = Number(button.dataset.restore);
-
-    try {
-        const result = await apiRequest("restore", { rollNo });
-
-        showMessage("recordMessage", result.message || "Student restored.");
-        await refreshData();
-    } catch (error) {
-        showMessage("recordMessage", error.message, true);
-    }
-});
-
-refreshData();
+(() => {
+  "use strict";
+  const KEY = "srm.students.v1", DELETED_KEY = "srm.deleted.v1";
+  const $ = id => document.getElementById(id);
+  const form = $("studentForm"), body = $("studentTableBody"), search = $("searchInput");
+  let descending = true, timer;
+  function load(key) { try { const x = JSON.parse(localStorage.getItem(key) || "[]"); return Array.isArray(x) ? x : []; } catch { return []; } }
+  let students = load(KEY), deleted = load(DELETED_KEY);
+  if (localStorage.getItem(KEY) === null) {
+    students = [
+      { roll: 101, name: "Aarav Menon", course: "B.Tech CSE", marks: 88 },
+      { roll: 102, name: "Ananya Joseph", course: "B.Tech CSE", marks: 94 },
+      { roll: 103, name: "Rahul Das", course: "B.Tech ECE", marks: 76 }
+    ]; save();
+  }
+  function save() { localStorage.setItem(KEY, JSON.stringify(students)); localStorage.setItem(DELETED_KEY, JSON.stringify(deleted)); }
+  function toast(message, error = false) { const el = $("toast"); el.textContent = message; el.classList.toggle("error", error); el.classList.add("show"); clearTimeout(timer); timer = setTimeout(() => el.classList.remove("show"), 2500); }
+  function esc(value) { return String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function initials(name) { return name.trim().split(/\s+/).slice(0, 2).map(x => x[0] || "").join("").toUpperCase(); }
+  function render() {
+    const q = search.value.trim().toLowerCase();
+    const shown = students.filter(s => String(s.roll).includes(q) || s.name.toLowerCase().includes(q) || s.course.toLowerCase().includes(q));
+    $("totalStudents").textContent = students.length;
+    $("recordCount").textContent = shown.length;
+    if (students.length) { $("averageMarks").textContent = (students.reduce((a, s) => a + Number(s.marks), 0) / students.length).toFixed(1); $("topMarks").textContent = Math.max(...students.map(s => Number(s.marks))).toFixed(0) + "%"; }
+    else { $("averageMarks").textContent = "—"; $("topMarks").textContent = "—"; }
+    body.innerHTML = shown.map(s => `<tr><td><div class="person"><span class="avatar">${esc(initials(s.name))}</span><span><b>${esc(s.name)}</b><small>Student record</small></span></div></td><td><span class="roll">#${esc(s.roll)}</span></td><td>${esc(s.course)}</td><td><span class="marks">${Number(s.marks).toFixed(1).replace(/\.0$/, "")}%</span></td><td><button class="delete" data-delete="${esc(s.roll)}" type="button">Delete</button></td></tr>`).join("");
+    $("emptyState").style.display = shown.length ? "none" : "block";
+    $("showingText").textContent = `Showing ${shown.length} of ${students.length} record${students.length === 1 ? "" : "s"}`;
+    $("restoreBtn").disabled = !deleted.length;
+  }
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const roll = Number($("roll").value), name = $("name").value.trim(), course = $("course").value.trim(), marks = Number($("marks").value);
+    if (!Number.isInteger(roll) || roll < 1) return toast("Enter a valid positive roll number.", true);
+    if (students.some(s => Number(s.roll) === roll)) return toast("That roll number already exists.", true);
+    if (!name || !course) return toast("Enter the student name and course.", true);
+    if (!Number.isFinite(marks) || marks < 0 || marks > 100) return toast("Marks must be between 0 and 100.", true);
+    students.push({ roll, name, course, marks }); save(); form.reset(); search.value = ""; render(); toast("Student record added successfully.");
+  });
+  body.addEventListener("click", e => {
+    const button = e.target.closest("[data-delete]"); if (!button) return;
+    const i = students.findIndex(s => Number(s.roll) === Number(button.dataset.delete)); if (i < 0) return;
+    deleted.push(students.splice(i, 1)[0]); if (deleted.length > 20) deleted.shift(); save(); render(); toast("Record deleted. You can restore it.");
+  });
+  $("restoreBtn").addEventListener("click", () => {
+    if (!deleted.length) return toast("There are no deleted records to restore.", true);
+    const s = deleted[deleted.length - 1]; if (students.some(x => Number(x.roll) === Number(s.roll))) return toast("That roll number already exists.", true);
+    students.push(deleted.pop()); save(); render(); toast("Last deleted record restored.");
+  });
+  search.addEventListener("input", render);
+  $("sortBtn").addEventListener("click", () => {
+    students.sort((a, b) => descending ? Number(b.marks) - Number(a.marks) : Number(a.marks) - Number(b.marks));
+    descending = !descending; $("sortBtn").textContent = descending ? "Sort by marks ↓" : "Sort by marks ↑"; save(); render(); toast("Records sorted by marks.");
+  });
+  render();
+})();
