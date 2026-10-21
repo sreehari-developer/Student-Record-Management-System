@@ -30,12 +30,18 @@ public class Student {
     static final List<StudentRecord> students = new ArrayList<>();
     static final Stack<StudentRecord> deletedStudents = new Stack<>();
 
-    static final Path ROOT = Paths.get(".").toAbsolutePath().normalize();
+    static final Path ROOT = Paths.get(".")
+            .toAbsolutePath().normalize();
 
     public static void main(String[] args) throws Exception {
 
+        int port = Integer.parseInt(
+                System.getenv().getOrDefault("PORT", "8080")
+        );
+
         HttpServer server = HttpServer.create(
-                new InetSocketAddress("127.0.0.1", 8080), 0);
+                new InetSocketAddress("0.0.0.0", port), 0
+        );
 
         server.createContext("/api/students", Student::handleApi);
         server.createContext("/", Student::handleFiles);
@@ -43,14 +49,14 @@ public class Student {
         server.start();
 
         System.out.println("Student Record Management System started!");
-        System.out.println("Open http://127.0.0.1:8080/");
+        System.out.println("Listening on port: " + port);
     }
 
     // LINEAR SEARCH
     static StudentRecord searchStudent(int rollNo) {
-        for (StudentRecord student : students) {
-            if (student.rollNo == rollNo) {
-                return student;
+        for (StudentRecord s : students) {
+            if (s.rollNo == rollNo) {
+                return s;
             }
         }
         return null;
@@ -59,10 +65,10 @@ public class Student {
     // JSON ESCAPING
     static String escapeJson(String text) {
         return text.replace("\\", "\\\\")
-                   .replace("\"", "\\\"")
-                   .replace("\n", "\\n")
-                   .replace("\r", "\\r")
-                   .replace("\t", "\\t");
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     static String studentJson(StudentRecord s) {
@@ -72,14 +78,16 @@ public class Student {
     }
 
     static String listJson(List<StudentRecord> list) {
-        StringBuilder result = new StringBuilder("[");
+        StringBuilder json = new StringBuilder("[");
 
         for (int i = 0; i < list.size(); i++) {
-            if (i > 0) result.append(",");
-            result.append(studentJson(list.get(i)));
+            if (i > 0) {
+                json.append(",");
+            }
+            json.append(studentJson(list.get(i)));
         }
 
-        return result.append("]").toString();
+        return json.append("]").toString();
     }
 
     static String allDataJson() {
@@ -88,7 +96,7 @@ public class Student {
                 + "}";
     }
 
-    // Simple JSON field reader for this application's request format.
+    // READ REQUEST FIELDS
     static String field(String json, String key) {
         Pattern pattern = Pattern.compile(
                 "\"" + Pattern.quote(key)
@@ -97,7 +105,9 @@ public class Student {
 
         Matcher matcher = pattern.matcher(json);
 
-        if (!matcher.find()) return null;
+        if (!matcher.find()) {
+            return null;
+        }
 
         if (matcher.group(1) != null) {
             return matcher.group(1)
@@ -111,19 +121,19 @@ public class Student {
         return matcher.group(2);
     }
 
-    static void sendJson(HttpExchange exchange, int status, String body)
-            throws IOException {
+    static void sendJson(
+            HttpExchange exchange, int status, String body
+    ) throws IOException {
 
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
 
         exchange.getResponseHeaders().set(
-                "Content-Type", "application/json; charset=UTF-8");
+                "Content-Type", "application/json; charset=UTF-8"
+        );
 
         exchange.getResponseHeaders().set(
-                "Cache-Control", "no-store");
-
-        exchange.getResponseHeaders().set(
-                "Access-Control-Allow-Origin", "null");
+                "Cache-Control", "no-store"
+        );
 
         exchange.sendResponseHeaders(status, bytes.length);
 
@@ -132,6 +142,7 @@ public class Student {
         }
     }
 
+    // API HANDLER
     static void handleApi(HttpExchange exchange) throws IOException {
 
         try {
@@ -148,7 +159,8 @@ public class Student {
 
             String body = new String(
                     exchange.getRequestBody().readAllBytes(),
-                    StandardCharsets.UTF_8);
+                    StandardCharsets.UTF_8
+            );
 
             String action = field(body, "action");
 
@@ -167,8 +179,8 @@ public class Student {
                     String name = field(body, "name");
                     String marksText = field(body, "marks");
 
-                    if (rollText == null || name == null || marksText == null
-                            || name.isBlank()) {
+                    if (rollText == null || name == null
+                            || marksText == null || name.isBlank()) {
                         sendJson(exchange, 400,
                                 "{\"error\":\"Fill in all fields.\"}");
                         return;
@@ -200,7 +212,8 @@ public class Student {
                     }
 
                     students.add(new StudentRecord(
-                            rollNo, name.trim(), marks));
+                            rollNo, name.trim(), marks
+                    ));
 
                     message = "Student added successfully.";
                     break;
@@ -258,7 +271,7 @@ public class Student {
 
                     if (searchStudent(rollNo) != null) {
                         sendJson(exchange, 400,
-                                "{\"error\":\"This roll number already exists.\"}");
+                                "{\"error\":\"Roll number already exists.\"}");
                         return;
                     }
 
@@ -269,14 +282,20 @@ public class Student {
                 }
 
                 case "sort": {
-                    // BUBBLE SORT: descending order by marks
+                    // BUBBLE SORT: descending order of marks
                     for (int i = 0; i < students.size() - 1; i++) {
-                        for (int j = 0; j < students.size() - i - 1; j++) {
+                        for (int j = 0;
+                             j < students.size() - i - 1; j++) {
+
                             if (students.get(j).marks
                                     < students.get(j + 1).marks) {
 
                                 StudentRecord temp = students.get(j);
-                                students.set(j, students.get(j + 1));
+
+                                students.set(
+                                        j, students.get(j + 1)
+                                );
+
                                 students.set(j + 1, temp);
                             }
                         }
@@ -300,12 +319,13 @@ public class Student {
                     "{\"error\":\"Invalid number format.\"}");
         } catch (Exception e) {
             e.printStackTrace();
+
             sendJson(exchange, 500,
-                    "{\"error\":\"Server error. Check the Java terminal.\"}");
+                    "{\"error\":\"Internal server error.\"}");
         }
     }
 
-    // SERVE HTML, CSS AND JAVASCRIPT FILES
+    // SERVE FRONTEND FILES
     static void handleFiles(HttpExchange exchange) throws IOException {
 
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -320,8 +340,7 @@ public class Student {
             urlPath = "/index.html";
         }
 
-        Path file = ROOT.resolve(urlPath.substring(1))
-                .normalize();
+        Path file = ROOT.resolve(urlPath.substring(1)).normalize();
 
         if (!file.startsWith(ROOT) || !Files.isRegularFile(file)) {
             byte[] bytes = "404 - File not found."
@@ -350,8 +369,13 @@ public class Student {
 
         byte[] bytes = Files.readAllBytes(file);
 
-        exchange.getResponseHeaders().set("Content-Type", contentType);
-        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.getResponseHeaders().set(
+                "Content-Type", contentType
+        );
+
+        exchange.getResponseHeaders().set(
+                "Cache-Control", "no-store"
+        );
 
         exchange.sendResponseHeaders(200, bytes.length);
 
