@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Student Record Management</title>
+
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+
+    <header class="header">
+        <div class="logo">🎓</div>
+        <div>
+            <h1>Student Records</h1>
+            <p>Student Record Management System</p>
+        </div>
+        <span class="status"><span></span> System Online</span>
+    </header>
+
+    <main>
+
+        <section class="welcome">
+            <div>
+                <p class="eyebrow">STUDENT MANAGEMENT</p>
+                <h2>Dashboard Overview</h2>
+                <p>Manage academic records efficiently.</p>
+            </div>
+            <div class="welcome-icon">📚</div>
+        </section>
+
+        <section class="stats">
+
+            <article class="stat-card purple">
+                <div class="stat-top">
+                    <span>Total Students</span>
+                    <span class="stat-icon">👥</span>
+                </div>
+                <h2 id="totalStudents">0</h2>
+                <p>Registered students</p>
+            </article>
+
+            <article class="stat-card blue">
+                <div class="stat-top">
+                    <span>Average Marks</span>
+                    <span class="stat-icon">📊</span>
+                </div>
+                <h2 id="averageMarks">0</h2>
+                <p>Overall average score</p>
+            </article>
+
+            <article class="stat-card green">
+                <div class="stat-top">
+                    <span>Highest Marks</span>
+                    <span class="stat-icon">🏆</span>
+                </div>
+                <h2 id="topMarks">0</h2>
+                <p>Best performance</p>
+            </article>
+
+        </section>
+
+        <section class="panel">
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">NEW RECORD</p>
+                    <h2>Add Student</h2>
+                </div>
+                <span class="heading-icon">✚</span>
+            </div>
+
+            <form id="studentForm">
+
+                <div class="form-group">
+                    <label for="rollNo">Roll Number</label>
+                    <input type="number" id="rollNo" min="1" step="1" placeholder="e.g. 101" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="name">Student Name</label>
+                    <input type="text" id="name" maxlength="100" placeholder="Enter full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="marks">Marks (0–100)</label>
+                    <input type="number" id="marks" min="0" max="100" step="0.01" placeholder="e.g. 85" required>
+                </div>
+
+                <button class="btn primary" type="submit">
+                    + Add Student
+                </button>
+
+            </form>
+
+            <p id="formMessage" class="message" role="status"></p>
+
+        </section>
+
+        <section class="panel">
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">RECORD DIRECTORY</p>
+                    <h2>Student Records</h2>
+                </div>
+                <span class="record-count" id="recordCount">0 records</span>
+            </div>
+
+            <div class="toolbar">
+
+                <input type="search" id="searchInput" placeholder="Search name or roll number..."
+                    aria-label="Search students">
+
+                <button class="btn secondary" id="searchBtn" type="button">
+                    Search
+                </button>
+
+                <button class="btn secondary" id="showAllBtn" type="button">
+                    Show All
+                </button>
+
+                <button class="btn secondary" id="sortBtn" type="button">
+                    ↓ Sort by Marks
+                </button>
+
+            </div>
+
+            <p id="recordMessage" class="message" role="status"></p>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Roll No.</th>
+                            <th>Student Name</th>
+                            <th>Marks</th>
+                            <th>Grade</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="studentTableBody">
+                        <tr>
+                            <td colspan="5" class="empty">
+                                Loading records...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+        <section class="panel">
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">STACK DATA STRUCTURE</p>
+                    <h2>Recently Deleted</h2>
+                </div>
+                <span class="heading-icon">♻️</span>
+            </div>
+
+            <p class="description">
+                Deleted student records are stored in a stack.
+                Restore the most recently deleted record first.
+            </p>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Roll No.</th>
+                            <th>Student Name</th>
+                            <th>Marks</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="deletedTableBody">
+                        <tr>
+                            <td colspan="4" class="empty">
+                                No deleted records
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer>
+        <h3>🎓 Student Record Management System</h3>
+        <p>HTML · CSS · JavaScript · Java</p>
+        <p>ArrayList · Stack · Linear Search · Bubble Sort</p>
+        <p class="copyright">Academic Project · 2026</p>
+    </footer>
+
+</body>
+
+</html>
